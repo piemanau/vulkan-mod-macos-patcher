@@ -1,3 +1,4 @@
+use copy_dir::copy_dir;
 use glob::glob;
 use std::fs;
 use std::io::Write;
@@ -6,10 +7,11 @@ use std::{
     fs::{File, OpenOptions},
     io::Read,
 };
-use copy_dir::copy_dir;
 
 fn modify_shaders() {
-    for entry in glob("input/assets/vulkanmod/shaders/**/*.vsh").expect("Failed to read glob pattern") {
+    for entry in
+        glob("input/assets/vulkanmod/shaders/**/*.vsh").expect("Failed to read glob pattern")
+    {
         match entry {
             Ok(path) => {
                 generate_shader_file(path);
@@ -18,7 +20,9 @@ fn modify_shaders() {
         }
     }
 
-    for entry in glob("input/assets/vulkanmod/shaders/**/*.fsh").expect("Failed to read glob pattern") {
+    for entry in
+        glob("input/assets/vulkanmod/shaders/**/*.fsh").expect("Failed to read glob pattern")
+    {
         match entry {
             Ok(path) => {
                 generate_shader_file(path);
@@ -106,7 +110,11 @@ fn add_new_jars() {
     }},",
                         path.file_name().unwrap().to_str().unwrap()
                     );
-                    let a = copy_dir(path.as_path(), "output/META-INF/jars/".to_string() + path.file_name().unwrap().to_str().unwrap());
+                let a = copy_dir(
+                    path.as_path(),
+                    "output/META-INF/jars/".to_string()
+                        + path.file_name().unwrap().to_str().unwrap(),
+                );
             }
             Err(e) => println!("{:?}", e),
         }
@@ -121,8 +129,7 @@ fn add_new_jars() {
 
     // println!("{}", string);
 
-    
-        let mut output = File::create(r#"output/fabric.mod.json"#).unwrap();
-        let line = string;
-        let _ = write!(output, "{}", line);
+    let mut output = File::create(r#"output/fabric.mod.json"#).unwrap();
+    let line = string;
+    let _ = write!(output, "{}", line);
 }
