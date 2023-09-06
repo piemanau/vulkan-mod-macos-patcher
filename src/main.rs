@@ -6,21 +6,22 @@ use std::{
     fs::{File, OpenOptions},
     io::Read,
 };
+use copy_dir::copy_dir;
 
-fn main() {
-    for entry in glob("input/**/*.vsh").expect("Failed to read glob pattern") {
+fn modify_shaders() {
+    for entry in glob("input/assets/vulkanmod/shaders/**/*.vsh").expect("Failed to read glob pattern") {
         match entry {
             Ok(path) => {
-                generate_file(path);
+                generate_shader_file(path);
             }
             Err(e) => println!("{:?}", e),
         }
     }
 
-    for entry in glob("input/**/*.fsh").expect("Failed to read glob pattern") {
+    for entry in glob("input/assets/vulkanmod/shaders/**/*.fsh").expect("Failed to read glob pattern") {
         match entry {
             Ok(path) => {
-                generate_file(path);
+                generate_shader_file(path);
             }
             Err(e) => println!("{:?}", e),
         }
@@ -29,7 +30,7 @@ fn main() {
     println!("Successfully converted the files!");
 }
 
-fn generate_file(path: PathBuf) {
+fn generate_shader_file(path: PathBuf) {
     if path.is_file() {
         let mut file = OpenOptions::new()
             .read(true)
@@ -70,4 +71,58 @@ void main() {
         let line = buffer;
         let _ = write!(output, "{}", line);
     }
+}
+
+fn main() {
+    modify_shaders();
+    add_new_jars();
+}
+
+fn add_new_jars() {
+    let mut file = OpenOptions::new()
+        .read(true)
+        .write(false) // <--------- this
+        .create(false)
+        .open("input/fabric.mod.json")
+        .unwrap();
+
+    let mut buffer = String::new();
+    let _length = file.read_to_string(&mut buffer).unwrap();
+
+    // println!("{}", buffer);
+
+    let mut files = String::from(r#"  "jars": ["#);
+
+    fs::create_dir_all(r#"output/META-INF/jars"#).unwrap();
+
+    for entry in glob("input/META-INF/jars/*.jar").expect("Failed to read glob pattern") {
+        match entry {
+            Ok(path) => {
+                files = files
+                    + &format!(
+                        "
+    {{
+      \"file\": \"{}\"
+    }},",
+                        path.file_name().unwrap().to_str().unwrap()
+                    );
+                    let a = copy_dir(path.as_path(), "output/META-INF/jars/".to_string() + path.file_name().unwrap().to_str().unwrap());
+            }
+            Err(e) => println!("{:?}", e),
+        }
+    }
+
+    files = files[0..files.len() - 1].to_string() + "\n  ]";
+
+    let (before_jars, after_start_of_jars) = buffer.split_once(r#"  "jars": ["#).unwrap();
+    let (_part_of_jars, after_jars) = after_start_of_jars.split_once("]").unwrap();
+
+    let string = before_jars.to_string() + &files + after_jars;
+
+    // println!("{}", string);
+
+    
+        let mut output = File::create(r#"output/fabric.mod.json"#).unwrap();
+        let line = string;
+        let _ = write!(output, "{}", line);
 }
