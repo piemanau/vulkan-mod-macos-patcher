@@ -1,6 +1,7 @@
 use copy_dir::copy_dir;
 use glob::glob;
-use std::fs;
+use std::error::Error;
+use std::{fs, env, result};
 use std::io::Write;
 use std::path::PathBuf;
 use std::{
@@ -8,24 +9,24 @@ use std::{
     io::Read,
 };
 
-fn modify_shaders() {
+fn modify_shaders(input: &String, output: &String) {
     for entry in
-        glob("input/assets/vulkanmod/shaders/**/*.vsh").expect("Failed to read glob pattern")
+        glob(&(input.to_owned() + "assets/vulkanmod/shaders/**/*.vsh")).expect("Failed to read glob pattern")
     {
         match entry {
             Ok(path) => {
-                generate_shader_file(path);
+                generate_shader_file(path, input, output);
             }
             Err(e) => println!("{:?}", e),
         }
     }
 
     for entry in
-        glob("input/assets/vulkanmod/shaders/**/*.fsh").expect("Failed to read glob pattern")
+        glob(&(input.to_owned() + "assets/vulkanmod/shaders/**/*.fsh")).expect("Failed to read glob pattern")
     {
         match entry {
             Ok(path) => {
-                generate_shader_file(path);
+                generate_shader_file(path, input, output);
             }
             Err(e) => println!("{:?}", e),
         }
@@ -34,7 +35,7 @@ fn modify_shaders() {
     println!("Successfully converted the files!");
 }
 
-fn generate_shader_file(path: PathBuf) {
+fn generate_shader_file(path: PathBuf, input: &String, output: &String) {
     if path.is_file() {
         let mut file = OpenOptions::new()
             .read(true)
@@ -62,32 +63,44 @@ void main() {
 
         // println!("{}", buffer);
 
-        let path = "output/".to_string()
-            + path
-                .as_path()
-                .to_str()
-                .unwrap()
-                .split("input")
-                .last()
-                .unwrap();
-        fs::create_dir_all(&path.rsplit_once("/").unwrap().0).unwrap();
+        let inner_folder = path.as_path().to_str().unwrap().rsplit_once(input.rsplit_once("/").unwrap().1).unwrap().1;
+        fs::create_dir_all(&inner_folder.rsplit_once("/").unwrap().0).unwrap();
         let mut output = File::create(path).unwrap();
         let line = buffer;
         let _ = write!(output, "{}", line);
     }
 }
 
-fn main() {
-    modify_shaders();
-    add_new_jars();
+#[derive(Debug)]
+enum CustomError {
+    IncorrectArguments,
 }
 
-fn add_new_jars() {
+fn main() -> Result<(), CustomError>{
+    let args: Vec<_> = env::args().collect();
+
+    if args.len() != 3 {
+        println!("Usage: <EXEC> <INPUT> <OUTPUT>");
+        return Err(CustomError::IncorrectArguments);
+    }
+    
+    let input = &args[1];
+    let output = &args[2];
+
+    modify_shaders(input, output);
+    add_new_jars(input, output);
+    Ok(())
+}
+
+fn add_new_jars(input: &String, output: &String) {
+
+    fs::create_dir_all(output.to_owned() + r#"/META-INF/jars"#).unwrap();
+
     let mut file = OpenOptions::new()
         .read(true)
-        .write(false) // <--------- this
+        .write(false)
         .create(false)
-        .open("input/fabric.mod.json")
+        .open(input.to_owned() + "/fabric.mod.json")
         .unwrap();
 
     let mut buffer = String::new();
@@ -97,9 +110,9 @@ fn add_new_jars() {
 
     let mut files = String::from(r#"  "jars": ["#);
 
-    fs::create_dir_all(r#"output/META-INF/jars"#).unwrap();
+    fs::create_dir_all(output.to_owned() + r#"/META-INF/jars"#).unwrap();
 
-    for entry in glob("input/META-INF/jars/*.jar").expect("Failed to read glob pattern") {
+    for entry in glob(&(input.to_owned() + "/META-INF/jars/*.jar")).expect("Failed to read glob pattern") {
         match entry {
             Ok(path) => {
                 files = files
@@ -112,7 +125,7 @@ fn add_new_jars() {
                     );
                 let a = copy_dir(
                     path.as_path(),
-                    "output/META-INF/jars/".to_string()
+                    output.to_owned() + "/META-INF/jars/"
                         + path.file_name().unwrap().to_str().unwrap(),
                 );
             }
@@ -129,7 +142,7 @@ fn add_new_jars() {
 
     // println!("{}", string);
 
-    let mut output = File::create(r#"output/fabric.mod.json"#).unwrap();
+    let mut output = File::create(output.to_owned() + r#"/fabric.mod.json"#).unwrap();
     let line = string;
     let _ = write!(output, "{}", line);
 }
